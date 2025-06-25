@@ -134,14 +134,31 @@ def process_mri_scan(image_path: Path):
 
     chat = model.start_chat()
     analysis_prompt = """
-    Please analyze this MRI brain scan image and provide:
+        Please analyze this MRI brain scan image and provide your analysis as a JSON object with the following structure. Fill in the values based on your analysis, using null or "N/A" if a field is not applicable. Do not include extra text or code block formatting outside the JSON.
 
-        1. Detection of any visible brain tumors (location, size, characteristics) and what type they are (glioma, meningioma, pituitary). The image may not have a tumor at all. If there is a tumor, give me the predicted X Y Z coordinates of where it is located. The dimensions of the scan are x=401, y=200, z=300.
-        2. Assessment of gray matter loss or abnormalities (regions affected, severity). There may not be any gray matter loss at all.
-        3. Other notable abnormalities (if present)
-        4. Recommended follow-up actions based on findings
+        {
+        "tumor_detection": {
+            "present": boolean,
+            "type": string (one of "glioma", "meningioma", "pituitary", or "none"),
+            "size": string (e.g., "2.5 cm", or "N/A"),
+            "location": string (e.g., "frontal lobe", or "N/A"),
+            "characteristics": string (brief description or "N/A"),
+            "coordinates": {
+            "x": number (predicted x coordinate or 0 if N/A),
+            "y": number (predicted y coordinate or 0 if N/A),
+            "z": number (predicted z coordinate or 0 if N/A)
+            }
+        },
+        "gray_matter": {
+            "abnormalities": boolean,
+            "regions_affected": string (brief description or "N/A"),
+            "severity": string (e.g., "mild", "moderate", "severe", or "N/A")
+        },
+        "other_abnormalities": string (brief description or "none"),
+        "follow_up_actions": string (brief recommendation)
+        }
 
-        Be very brief in analysis but accurate. Output your analysis as a JSON object only, without extra text or code block formatting.
+        The dimensions of the scan are x=401, y=200, z=300. Be accurate and concise in your analysis.
     """
     raw = chat.send_message([img_file, analysis_prompt]).text.strip()
     clean = re.sub(r"^```(?:json)?\n|\n```$", "", raw)
@@ -178,18 +195,49 @@ def process_mri_scan(image_path: Path):
             ContentType="image/jpeg",
         )
 
-    # Summary
-    chat_sum = model.start_chat()
-    sum_prompt = (
-        "Summarize this analysis (2–3 sentences):\n"
-        + json.dumps(analysis_json, indent=2)
-    )
-    summary = chat_sum.send_message(sum_prompt).text.strip()
+    # Generate templated summary from analysis JSON
+    tumor_info = ""
+    if analysis_json['tumor_detection']['present']:
+        tumor_type = analysis_json['tumor_detection']['type']
+        tumor_size = analysis_json['tumor_detection']['size']
+        tumor_location = analysis_json['tumor_detection']['location']
+        tumor_info = f"A {tumor_type} tumor of size {tumor_size} was detected in the {tumor_location}."
+    else:
+        tumor_info = "No tumor was detected in the MRI scan."
+        
+    gray_matter_info = ""
+    if analysis_json['gray_matter']['abnormalities']:
+        gray_matter_regions = analysis_json['gray_matter']['regions_affected']
+        gray_matter_severity = analysis_json['gray_matter']['severity']
+        gray_matter_info = f"Gray matter abnormalities were observed in {gray_matter_regions} with {gray_matter_severity} severity."
+    else:
+        gray_matter_info = "No gray matter abnormalities were observed."
+        
+    other_abnormalities = analysis_json['other_abnormalities'] if analysis_json['other_abnormalities'] != "none" else "No other abnormalities were noted."
+    follow_up = analysis_json['follow_up_actions']
+    
+    summary = f"{tumor_info} {gray_matter_info} {other_abnormalities} Recommended follow-up: {follow_up}"
+    
+    # Extract tags for tumor type and size
+    tags = {
+        "tumor_type": analysis_json['tumor_detection']['type'] if analysis_json['tumor_detection']['present'] else "none",
+        "tumor_size": analysis_json['tumor_detection']['size'] if analysis_json['tumor_detection']['present'] else "N/A"
+    }
+    
     cli.put_object(
         Bucket=S3_BUCKET,
         Key=folder + sum_name,
         Body=summary,
         ContentType="text/plain",
+    )
+    
+    # Store tags
+    tags_name = f"tags_{ts}.json"
+    cli.put_object(
+        Bucket=S3_BUCKET,
+        Key=folder + tags_name,
+        Body=json.dumps(tags, indent=4),
+        ContentType="application/json",
     )
 
     return {
@@ -199,6 +247,7 @@ def process_mri_scan(image_path: Path):
         "image_file": folder + img_name,
         "image_url": f"https://{S3_BUCKET}.s3.amazonaws.com/{folder + img_name}",
         "summary_file": folder + sum_name,
+        "tags_file": folder + tags_name,
     }
 
 
