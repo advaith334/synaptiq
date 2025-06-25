@@ -1,2 +1,6 @@
 .next
 node_modules
+data
+venv
+__pycache__/
+*.py[cod]
