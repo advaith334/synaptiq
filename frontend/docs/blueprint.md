@@ -1,4 +1,4 @@
-# **App Name**: NeuroAccess
+# **App Name**: Synaptiq
 
 ## Core Features:
 

@@ -119,7 +119,7 @@ export default function Home() {
         className="mb-6"
         style={{ width: '180px', height: '130px' }}
       />
-      <h1 className="text-4xl font-bold mb-4">Neurolytics</h1>
+      <h1 className="text-4xl font-bold mb-4">Synaptiq</h1>
       <p className="text-lg mb-8">Neuro-oncology unlocked for anyone, everyone.</p>
 
       <Tabs defaultValue="upload" className="w-full max-w-2xl mb-8">

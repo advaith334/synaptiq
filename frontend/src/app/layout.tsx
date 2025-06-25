@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'NeuroAccess',
+  title: 'Synaptiq',
   description: 'Neurooncology unlocked for anyone, everyone',
 };
 
