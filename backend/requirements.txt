@@ -14,3 +14,6 @@ pandas
 tqdm
 scikit-learn
 scikit-image
+google-generativeai
+boto3
+requests
