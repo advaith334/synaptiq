@@ -1,3 +1,16 @@
 pydicom
 numpy
 napari[all]
+flask
+flask-cors
+flask-restful
+flask-socketio
+eventlet
+python-dotenv
+scikit-image
+scipy
+opencv-python
+pandas
+tqdm
+scikit-learn
+scikit-image
