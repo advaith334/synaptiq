@@ -216,7 +216,7 @@ def process_mri_scan(image_path: Path):
     other_abnormalities = analysis_json['other_abnormalities'] if analysis_json['other_abnormalities'] != "none" else "No other abnormalities were noted."
     follow_up = analysis_json['follow_up_actions']
     
-    summary = f"{tumor_info} {gray_matter_info} {other_abnormalities} Recommended follow-up: {follow_up}"
+    summary = f"{tumor_info} {gray_matter_info} {other_abnormalities}\n\nRecommended follow-up: {follow_up}"
     
     # Extract tags for tumor type and size
     tags = {
@@ -320,6 +320,9 @@ def history():
             summ = next(
                 (f for f in all_files if f"saved/{ts}/summary_{ts}" in f["Key"]), None
             )
+            tags = next(
+                (f for f in all_files if f"saved/{ts}/tags_{ts}" in f["Key"]), None
+            )
             if not (img and summ):
                 continue
 
@@ -330,12 +333,18 @@ def history():
             summ_obj = cli.get_object(Bucket=S3_BUCKET, Key=summ["Key"])
             summ_txt = summ_obj["Body"].read().decode()
 
+            tags_data = {}
+            if tags:
+                tags_obj = cli.get_object(Bucket=S3_BUCKET, Key=tags["Key"])
+                tags_data = json.loads(tags_obj["Body"].read())
+
             history.append(
                 {
                     "timestamp": ts,
                     "mri_url": img_url,
                     "context": ctx_json,
                     "summary": summ_txt,
+                    "tags": tags_data,
                 }
             )
 
