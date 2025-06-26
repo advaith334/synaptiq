@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from pathlib import Path
 from datetime import datetime
@@ -12,6 +12,7 @@ import shutil
 import time
 from werkzeug.utils import secure_filename
 from botocore.exceptions import NoCredentialsError
+import io
 
 # ----------- CONFIG ----------------------------------------------------------
 import subprocess
@@ -100,7 +101,7 @@ def get_analysis_by_timestamp(ts: str):
 
     return {
         "context": context,
-        "mri_url": f"https://{S3_BUCKET}.s3.amazonaws.com/{mri_key}",
+        "mri_url": f"http://localhost:5001/image/{ts}/mri_{ts}.jpg",
         "timestamp": ts,
     }
 
@@ -197,7 +198,7 @@ def process_mri_scan(image_path: Path):
         "timestamp": ts,
         "json_file": folder + json_name,
         "image_file": folder + img_name,
-        "image_url": f"https://{S3_BUCKET}.s3.amazonaws.com/{folder + img_name}",
+        "image_url": f"http://localhost:5001/image/{ts}/mri_{ts}{img_ext}",
         "summary_file": folder + sum_name,
     }
 
@@ -274,7 +275,7 @@ def history():
             if not (img and summ):
                 continue
 
-            img_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{img['Key']}"
+            img_url = f"http://localhost:5001/image/{ts}/mri_{ts}.jpg"
             ctx_obj = cli.get_object(Bucket=S3_BUCKET, Key=ctx["Key"])
             ctx_json = json.loads(ctx_obj["Body"].read())
 
@@ -341,6 +342,41 @@ def run_viewer():
     thread.start()
     
     return jsonify({"success": True, "message": f"Viewer launched for scan directory: {scan_dir}"})
+
+@app.route("/image/<timestamp>/<filename>")
+def serve_image(timestamp, filename):
+    """Serve images from S3 through Flask to avoid CORS issues."""
+    try:
+        cli = s3_client()
+        key = f"saved/{timestamp}/{filename}"
+        
+        # Get the object from S3
+        obj = cli.get_object(Bucket=S3_BUCKET, Key=key)
+        
+        # Create a file-like object from the S3 response
+        image_data = obj['Body'].read()
+        image_stream = io.BytesIO(image_data)
+        image_stream.seek(0)
+        
+        # Determine content type
+        content_type = obj.get('ContentType', 'image/jpeg')
+        
+        response = send_file(
+            image_stream,
+            mimetype=content_type,
+            as_attachment=False,
+            download_name=filename
+        )
+        
+        # Add CORS headers
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        
+        return response
+    except Exception as e:
+        print(f"Error serving image {timestamp}/{filename}: {e}")
+        return jsonify({"error": "Image not found"}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
