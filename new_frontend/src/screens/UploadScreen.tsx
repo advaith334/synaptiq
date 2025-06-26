@@ -92,16 +92,6 @@ const UploadScreen: React.FC = () => {
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-2xl">
-        {/* Space for Brain GIF */}
-        <div className="h-32 mb-8 flex items-center justify-center">
-          {/* This is where your brain GIF will go */}
-          <div className="text-center">
-            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-blue-600/20 to-purple-600/20 dark:from-blue-500/30 dark:to-purple-500/30 rounded-full flex items-center justify-center border-2 border-blue-300/30 dark:border-blue-400/30">
-              <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">Brain GIF</span>
-            </div>
-          </div>
-        </div>
-
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-slate-800 dark:text-white mb-4">
