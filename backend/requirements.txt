@@ -13,7 +13,21 @@ opencv-python
 pandas
 tqdm
 scikit-learn
-scikit-image
 google-generativeai
 boto3
 requests
+werkzeug
+botocore
+# New features dependencies
+torch
+torchvision
+Pillow
+# Additional dependencies for image processing and ML
+matplotlib
+seaborn
+jupyter
+ipykernel
+# For better performance
+numba
+# For data handling
+h5py
