@@ -28,7 +28,7 @@ const DicomViewerButton = () => {
 
     console.log("Launching viewer...");
     try {
-      const response = await fetch("http://localhost:5000/run-viewer", {
+      const response = await fetch("http://localhost:5001/run-viewer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -136,7 +136,7 @@ export default function ChatPage() {
         timestamp,
       };
 
-      const res = await fetch("http://localhost:5000/chat", {
+      const res = await fetch("http://localhost:5001/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

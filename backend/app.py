@@ -50,7 +50,7 @@ generation_config = dict(
 )
 
 model = genai.GenerativeModel(
-    model_name="gemini-pro-vision",
+    model_name="gemini-1.5-flash",
     generation_config=generation_config,
 )
 
@@ -58,7 +58,7 @@ model = genai.GenerativeModel(
 # ----------- FLASK APP -------------------------------------------------------
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 # ----------- HELPERS ---------------------------------------------------------
@@ -343,4 +343,4 @@ def run_viewer():
     return jsonify({"success": True, "message": f"Viewer launched for scan directory: {scan_dir}"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

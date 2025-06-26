@@ -13,7 +13,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch('http://localhost:5000/history');
+        const res = await fetch('http://localhost:5001/history');
         const data = await res.json();
         setHistoryItems(data);
       } catch (error) {

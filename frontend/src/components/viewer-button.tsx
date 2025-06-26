@@ -4,7 +4,7 @@ export class ViewerButton {
   private statusElement: HTMLDivElement;
   private apiUrl: string;
 
-  constructor(containerId: string, apiUrl: string = "http://localhost:5000") {
+  constructor(containerId: string, apiUrl: string = "http://localhost:5001") {
     const container = document.getElementById(containerId);
     if (!container)
       throw new Error(`Container with ID ${containerId} not found`);
