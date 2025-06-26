@@ -36,9 +36,6 @@ Synaptiq is an advanced web application that leverages AI to analyze brain MRI s
 - Easy access to previous consultations
 - Export and review capabilities
 
-![Chat Interface](docs/images/chat.png)
-![History Page](docs/images/history.png)
-
 ## 🏗️ Architecture
 
 ### Frontend
