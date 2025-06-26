@@ -11,94 +11,94 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // const fetchHistory = async () => {
-    //   try {
-    //     const res = await fetch('http://localhost:5000/history');
-    //     const data = await res.json();
-    //     setHistoryItems(data);
-    //   } catch (error) {
-    //     console.error('Error fetching history:', error);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/history');
+        const data = await res.json();
+        setHistoryItems(data);
+      } catch (error) {
+        console.error('Error fetching history:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     // fetchHistory();
         // Mock data for testing frontend display without backend
-        const mockHistoryItems = [
-          {
-            timestamp: "20230625_143022",
-            mri_url: "https://via.placeholder.com/150",
-            context: {
-              tumor_detection: {
-                present: true,
-                type: "glioma",
-                confidence_percentage: 87.5,
-                size: "2.3 cm",
-                location: "frontal lobe",
-                characteristics: "irregular borders",
-                key_features: ["Heterogeneous ring enhancement", "Necrotic core", "Crosses corpus callosum"],
-                distinguishers: ["Vs. metastasis: Less vasogenic edema relative to size", "Vs. lymphoma: Shows restricted diffusion"],
-                coordinates: { x: 200, y: 100, z: 150 }
-              },
-              gray_matter: {
-                abnormalities: false,
-                regions_affected: "N/A",
-                severity: "N/A"
-              },
-              other_abnormalities: "none",
-              differential_diagnosis: [
-                { 
-                  type: "glioblastoma", 
-                  confidence_percentage: 60.2,
-                  key_features: ["Rapid growth", "Infiltrative margins"],
-                  distinguishers: ["Vs. glioma: More aggressive progression"]
-                },
-                { 
-                  type: "astrocytoma", 
-                  confidence_percentage: 25.8,
-                  key_features: ["Diffuse infiltration", "Cystic components"],
-                  distinguishers: ["Vs. glioma: Slower growth rate"]
-                }
-              ],
-              follow_up_actions: "Consult neurologist for further evaluation."
-            },
-            summary: "A glioma tumor of size 2.3 cm was detected in the frontal lobe. No gray matter abnormalities were observed. No other abnormalities were noted. Recommended follow-up: Consult neurologist for further evaluation.",
-            tags: {
-              tumor_type: "glioma",
-              tumor_size: "2.3 cm"
-            }
-          },
-          {
-            timestamp: "20230624_102015",
-            mri_url: "https://via.placeholder.com/150",
-            context: {
-              tumor_detection: {
-                present: false,
-                type: "none",
-                confidence_percentage: 0,
-                size: "N/A",
-                location: "N/A",
-                characteristics: "N/A",
-                coordinates: { x: 0, y: 0, z: 0 }
-              },
-              gray_matter: {
-                abnormalities: true,
-                regions_affected: "temporal lobe",
-                severity: "mild"
-              },
-              other_abnormalities: "none",
-              follow_up_actions: "Monitor with annual scans."
-            },
-            summary: "No tumor was detected in the MRI scan. Gray matter abnormalities were observed in temporal lobe with mild severity. No other abnormalities were noted. Recommended follow-up: Monitor with annual scans.",
-            tags: {
-              tumor_type: "none",
-              tumor_size: "N/A"
-            }
-          }
-        ];
-        setHistoryItems(mockHistoryItems);
-        setLoading(false);    
+//         const mockHistoryItems = [
+//           {
+//             timestamp: "20230625_143022",
+//             mri_url: "https://via.placeholder.com/150",
+//             context: {
+//               tumor_detection: {
+//                 present: true,
+//                 type: "glioma",
+//                 confidence_percentage: 87.5,
+//                 size: "2.3 cm",
+//                 location: "frontal lobe",
+//                 characteristics: "irregular borders",
+//                 key_features: ["Heterogeneous ring enhancement", "Necrotic core", "Crosses corpus callosum"],
+//                 distinguishers: ["Vs. metastasis: Less vasogenic edema relative to size", "Vs. lymphoma: Shows restricted diffusion"],
+//                 coordinates: { x: 200, y: 100, z: 150 }
+//               },
+//               gray_matter: {
+//                 abnormalities: false,
+//                 regions_affected: "N/A",
+//                 severity: "N/A"
+//               },
+//               other_abnormalities: "none",
+//               differential_diagnosis: [
+//                 { 
+//                   type: "glioblastoma", 
+//                   confidence_percentage: 60.2,
+//                   key_features: ["Rapid growth", "Infiltrative margins"],
+//                   distinguishers: ["Vs. glioma: More aggressive progression"]
+//                 },
+//                 { 
+//                   type: "astrocytoma", 
+//                   confidence_percentage: 25.8,
+//                   key_features: ["Diffuse infiltration", "Cystic components"],
+//                   distinguishers: ["Vs. glioma: Slower growth rate"]
+//                 }
+//               ],
+//               follow_up_actions: "Consult neurologist for further evaluation."
+//             },
+//             summary: "A glioma tumor of size 2.3 cm was detected in the frontal lobe. No gray matter abnormalities were observed. No other abnormalities were noted. Recommended follow-up: Consult neurologist for further evaluation.",
+//             tags: {
+//               tumor_type: "glioma",
+//               tumor_size: "2.3 cm"
+//             }
+//           },
+//           {
+//             timestamp: "20230624_102015",
+//             mri_url: "https://via.placeholder.com/150",
+//             context: {
+//               tumor_detection: {
+//                 present: false,
+//                 type: "none",
+//                 confidence_percentage: 0,
+//                 size: "N/A",
+//                 location: "N/A",
+//                 characteristics: "N/A",
+//                 coordinates: { x: 0, y: 0, z: 0 }
+//               },
+//               gray_matter: {
+//                 abnormalities: true,
+//                 regions_affected: "temporal lobe",
+//                 severity: "mild"
+//               },
+//               other_abnormalities: "none",
+//               follow_up_actions: "Monitor with annual scans."
+//             },
+//             summary: "No tumor was detected in the MRI scan. Gray matter abnormalities were observed in temporal lobe with mild severity. No other abnormalities were noted. Recommended follow-up: Monitor with annual scans.",
+//             tags: {
+//               tumor_type: "none",
+//               tumor_size: "N/A"
+//             }
+//           }
+//         ];
+//         setHistoryItems(mockHistoryItems);
+//         setLoading(false);    
   }, []);
 
   const handleHistoryClick = (item: any) => {

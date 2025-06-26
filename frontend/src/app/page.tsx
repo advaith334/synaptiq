@@ -59,7 +59,7 @@ export default function Home() {
         // Show loading page
         router.push('/loading');
     
-        const response = await fetch('http://localhost:5000/analyze_mri', {
+        const response = await fetch('http://localhost:5001/analyze_mri', {
           method: 'POST',
           body: formData,
         });
