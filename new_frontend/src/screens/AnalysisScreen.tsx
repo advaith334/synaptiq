@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Send, Loader2, Cuboid as Cube, Database, Activity, Brain, AlertTriangle } from 'lucide-react';
+import { Send, Loader2, Cuboid as Cube, Database, Activity, Brain, AlertTriangle, X } from 'lucide-react';
 import { saveAnalysisToHistory, updateAnalysisInHistory, getAnalysisFromHistory, HistoryItem } from '../utils/historyStorage';
 
 interface ChatMessage {
@@ -18,6 +18,16 @@ interface StoredFile {
   preview: string;
 }
 
+interface SimilarCase {
+  rank: number;
+  case_id: number;
+  label: string;
+  file_path: string;
+  filename: string;
+  image_url: string;
+  similarity_score: number;
+}
+
 const AnalysisScreen: React.FC = () => {
   const { jobId } = useParams();
   const [isProcessing, setIsProcessing] = useState(true);
@@ -26,6 +36,10 @@ const AnalysisScreen: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<StoredFile | null>(null);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [similarCases, setSimilarCases] = useState<SimilarCase[]>([]);
+  const [showSimilarCases, setShowSimilarCases] = useState(false);
+  const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
+  const [searchTimestamp, setSearchTimestamp] = useState<Date | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -132,6 +146,40 @@ const AnalysisScreen: React.FC = () => {
     }
   };
 
+  const handleShowSimilarCases = async () => {
+    if (!analysis?.mri_url) return;
+    
+    setIsLoadingSimilar(true);
+    try {
+      // Download the image from the URL
+      const response = await fetch(analysis.mri_url);
+      const blob = await response.blob();
+      
+      // Create FormData with the image
+      const formData = new FormData();
+      formData.append('file', blob, 'mri_scan.jpg');
+      
+      // Send to similar cases endpoint
+      const similarResponse = await fetch('http://localhost:5001/similar_cases', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await similarResponse.json();
+      if (result.similar_cases) {
+        setSimilarCases(result.similar_cases);
+        setSearchTimestamp(new Date());
+        setShowSimilarCases(true);
+      } else {
+        alert(result.error || 'Failed to find similar cases.');
+      }
+    } catch (error) {
+      alert('Error finding similar cases.');
+    } finally {
+      setIsLoadingSimilar(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Processing Banner */}
@@ -221,11 +269,16 @@ const AnalysisScreen: React.FC = () => {
               </button>
               
               <button 
+                onClick={handleShowSimilarCases}
+                disabled={isProcessing || !analysis?.mri_url || isLoadingSimilar}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-200 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isProcessing || !analysis?.mri_url}
               >
-                <Database className="h-4 w-4" />
-                <span>Show Similar Cases</span>
+                {isLoadingSimilar ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Database className="h-4 w-4" />
+                )}
+                <span>{isLoadingSimilar ? 'Finding Similar Cases...' : 'Show Similar Cases'}</span>
               </button>
             </div>
 
@@ -323,6 +376,84 @@ const AnalysisScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Similar Cases Modal */}
+      {showSimilarCases && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
+                    Similar Cases Found
+                  </h2>
+                  {searchTimestamp && (
+                    <p className="text-sm text-slate-600 dark:text-gray-400 mt-1">
+                      Search performed at {searchTimestamp.toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowSimilarCases(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="mb-4 text-sm text-slate-600 dark:text-gray-400">
+                Showing fresh similarity results for your MRI scan
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {similarCases.map((case_item) => (
+                  <div
+                    key={`${case_item.case_id}-${case_item.similarity_score}`}
+                    className="bg-slate-50 dark:bg-gray-800 rounded-lg p-4 border border-slate-200 dark:border-gray-700"
+                  >
+                    <div className="aspect-square bg-slate-200 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                      <img
+                        src={`http://localhost:5001${case_item.image_url}`}
+                        alt={`Case ${case_item.case_id}`}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.style.display = 'none';
+                          const nextElement = target.nextElementSibling as HTMLElement;
+                          if (nextElement) nextElement.style.display = 'flex';
+                        }}
+                      />
+                      <div className="hidden items-center justify-center text-slate-400 dark:text-gray-500">
+                        <Database className="h-8 w-8" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-800 dark:text-white">
+                          {case_item.label}
+                        </span>
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                          #{case_item.rank}
+                        </span>
+                      </div>
+                      
+                      <div className="text-xs text-slate-600 dark:text-gray-400">
+                        Case ID: {case_item.case_id}
+                      </div>
+                      
+                      <div className="text-xs text-slate-600 dark:text-gray-400">
+                        Similarity: {(case_item.similarity_score * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

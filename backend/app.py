@@ -19,9 +19,156 @@ import subprocess
 import sys
 from threading import Thread
 
+# Add imports for vector search
+from PIL import Image
+import torch
+import torchvision.transforms as T
+from torchvision.models import resnet18
+import tempfile
+import html
+import numpy as np
+import pandas as pd
+import base64
+
 UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Vector search configuration
+VECTOR_ROOT = Path(__file__).parent / "new-features"
+VECTOR_BUNDLE = VECTOR_ROOT / "atlas_numpy_bundle.npz"
+VECTOR_META = VECTOR_ROOT / "atlas_meta.csv"
+
+# Real image database configuration
+REAL_IMAGES_ROOT = Path(__file__).parent.parent / "data" / "Testing"
+
+# Initialize vector search model (global to avoid reloading)
+vector_model = None
+vector_transform = None
+real_image_embeddings = None
+real_image_paths = None
+
+def initialize_vector_search():
+    """Initialize the vector search model and data."""
+    global vector_model, vector_transform, real_image_embeddings, real_image_paths
+    
+    if vector_model is not None:
+        return  # Already initialized
+    
+    try:
+        # Build the embedder (ResNet-18 backbone)
+        print("Initializing ResNet-18 model for vector search...")
+        device = "cpu"
+        vector_model = resnet18(weights="IMAGENET1K_V1")
+        vector_model.fc = torch.nn.Identity()
+        vector_model.eval().to(device)
+        
+        vector_transform = T.Compose([
+            T.Resize(224), T.CenterCrop(224),
+            T.ToTensor(),
+            T.Normalize([0.485,0.456,0.406], [0.229,0.224,0.225])
+        ])
+        
+        # Load and embed real images from data/Testing
+        print("Loading real images from data/Testing directory...")
+        load_real_image_embeddings()
+        
+        print("Vector search initialized successfully")
+    except Exception as e:
+        print(f"Warning: Vector search initialization failed: {e}")
+        print("Vector search will use simplified mode")
+        vector_model = None
+
+def load_real_image_embeddings():
+    """Load and embed all real images from the data/Testing directory."""
+    global real_image_embeddings, real_image_paths
+    
+    if not REAL_IMAGES_ROOT.exists():
+        print(f"Warning: Real images directory not found: {REAL_IMAGES_ROOT}")
+        return
+    
+    try:
+        real_image_paths = []
+        embeddings_list = []
+        
+        # Walk through all subdirectories in data/Testing
+        for tumor_type_dir in REAL_IMAGES_ROOT.iterdir():
+            if tumor_type_dir.is_dir():
+                tumor_type = tumor_type_dir.name
+                print(f"Processing {tumor_type} images...")
+                
+                for img_file in tumor_type_dir.glob("*.jpg"):
+                    try:
+                        # Embed the image
+                        embedding = embed_image(str(img_file))
+                        
+                        real_image_paths.append({
+                            "path": str(img_file),
+                            "tumor_type": tumor_type,
+                            "filename": img_file.name
+                        })
+                        embeddings_list.append(embedding)
+                        
+                    except Exception as e:
+                        print(f"Error embedding {img_file}: {e}")
+                        continue
+        
+        if embeddings_list:
+            real_image_embeddings = np.array(embeddings_list)
+            print(f"Loaded {len(real_image_paths)} real images with embeddings")
+        else:
+            print("No real images could be loaded")
+            
+    except Exception as e:
+        print(f"Error loading real image embeddings: {e}")
+
+@torch.no_grad()
+def embed_image(img_path) -> np.ndarray:
+    """Embed an image using the ResNet-18 model."""
+    if vector_model is None:
+        raise RuntimeError("Vector search not initialized")
+    
+    img = Image.open(img_path).convert("RGB")
+    vec = vector_model(vector_transform(img).unsqueeze(0)).squeeze().cpu().numpy()
+    return (vec / np.linalg.norm(vec)).astype(np.float32)
+
+def find_similar_cases(img_path, top_k=8):
+    """Find similar cases for a given image using real images from data/Testing."""
+    if vector_model is None or real_image_embeddings is None:
+        return {"error": "Vector search not available"}
+    
+    try:
+        # Use the actual uploaded image for vector search
+        print(f"Performing vector search on uploaded image: {img_path}")
+        
+        # Embed the uploaded image using ResNet-18
+        query_vec = embed_image(img_path)
+        print(f"Generated embedding vector with shape: {query_vec.shape}")
+        
+        # Calculate cosine similarities with all real images
+        similarities = np.dot(real_image_embeddings, query_vec)
+        
+        # Get top-k most similar images
+        top_indices = np.argsort(similarities)[::-1][:top_k]
+        
+        results = []
+        for rank, idx in enumerate(top_indices, 1):
+            image_info = real_image_paths[idx]
+            similarity_score = float(similarities[idx])
+            
+            results.append({
+                "rank": rank,
+                "case_id": rank,
+                "label": image_info["tumor_type"],
+                "file_path": image_info["path"],
+                "filename": image_info["filename"],
+                "similarity_score": similarity_score
+            })
+        
+        print(f"Found {len(results)} similar cases with scores ranging from {results[-1]['similarity_score']:.3f} to {results[0]['similarity_score']:.3f}")
+        return {"similar_cases": results}
+    except Exception as e:
+        print(f"Vector search error: {e}")
+        return {"error": f"Vector search failed: {str(e)}"}
 
 def load_env():
     """Populate os.environ from .env.local (simple line-by-line parser)."""
@@ -60,6 +207,9 @@ model = genai.GenerativeModel(
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Initialize vector search on app startup
+initialize_vector_search()
 
 
 # ----------- HELPERS ---------------------------------------------------------
@@ -376,6 +526,76 @@ def serve_image(timestamp, filename):
         return response
     except Exception as e:
         print(f"Error serving image {timestamp}/{filename}: {e}")
+        return jsonify({"error": "Image not found"}), 404
+
+@app.route("/similar_cases", methods=["POST"])
+def similar_cases():
+    """Find similar cases for an uploaded image."""
+    try:
+        if "file" not in request.files or not request.files["file"].filename:
+            return jsonify({"error": "No file provided"}), 400
+
+        file = request.files["file"]
+        filename = secure_filename(file.filename)
+        tmp_path = Path(UPLOAD_FOLDER) / filename
+        file.save(tmp_path)
+
+        try:
+            # Initialize vector search if not already done
+            initialize_vector_search()
+            
+            # Find similar cases using real images
+            result = find_similar_cases(tmp_path, top_k=8)
+            
+            if "error" in result:
+                return jsonify(result), 500
+            
+            # Update image URLs to point to the real image serving endpoint
+            for case in result["similar_cases"]:
+                case["image_url"] = f"/real_image/{case['filename']}"
+            
+            return jsonify(result), 200
+        finally:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
+    except Exception as e:
+        print(f"Error in /similar_cases endpoint: {e}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+@app.route("/real_image/<filename>")
+def serve_real_image(filename):
+    """Serve real images from the data/Testing directory."""
+    try:
+        # Find the image in the data/Testing directory
+        for tumor_type_dir in REAL_IMAGES_ROOT.iterdir():
+            if tumor_type_dir.is_dir():
+                img_path = tumor_type_dir / filename
+                if img_path.exists():
+                    # Read and serve the image
+                    with open(img_path, 'rb') as f:
+                        image_data = f.read()
+                    
+                    response = send_file(
+                        io.BytesIO(image_data),
+                        mimetype='image/jpeg',
+                        as_attachment=False,
+                        download_name=filename
+                    )
+                    
+                    # Add CORS headers
+                    response.headers['Access-Control-Allow-Origin'] = '*'
+                    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+                    
+                    return response
+        
+        # If image not found
+        return jsonify({"error": "Image not found"}), 404
+        
+    except Exception as e:
+        print(f"Error serving real image {filename}: {e}")
         return jsonify({"error": "Image not found"}), 404
 
 if __name__ == '__main__':
