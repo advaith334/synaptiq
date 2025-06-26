@@ -25,143 +25,110 @@ const AnalysisScreen: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<StoredFile | null>(null);
-  const [analysisFindings, setAnalysisFindings] = useState('');
+  const [analysis, setAnalysis] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!jobId) return;
-
-    // Check if this analysis already exists in history
-    const existingAnalysis = getAnalysisFromHistory(jobId);
-    
-    if (existingAnalysis) {
-      // Load existing analysis data
-      setUploadedFile(existingAnalysis.uploadedFiles[0] || null);
-      setMessages(existingAnalysis.messages);
-      setAnalysisFindings(existingAnalysis.findings);
-      setIsProcessing(existingAnalysis.status === 'processing');
-    } else {
-      // New analysis - retrieve uploaded file from sessionStorage
-      const storedFiles = sessionStorage.getItem('uploadedMRIFiles');
-      if (storedFiles) {
-        const files = JSON.parse(storedFiles);
-        const file = files[0]; // Get the single uploaded file
-        setUploadedFile(file);
-        
-        // Save initial analysis to history
-        const initialAnalysis = {
-          jobId,
-          timestamp: new Date(),
-          filename: file?.name || 'Unknown scan',
-          lastQuestion: '',
-          status: 'processing' as const,
-          thumbnail: file?.preview || '',
-          findings: '',
-          uploadedFiles: files,
-          messages: []
-        };
-        
-        saveAnalysisToHistory(initialAnalysis);
-      }
-
-      // Simulate processing completion
-      const timer = setTimeout(() => {
+    setIsProcessing(true);
+    fetch('http://localhost:5001/history')
+      .then(res => res.json())
+      .then(data => {
+        const found = data.find((item: any) => item.timestamp === jobId);
+        if (found) {
+          setAnalysis(found);
+          setMessages([
+            {
+              id: 'ai-init',
+              type: 'ai',
+              content: found.summary || 'Analysis complete! Ready for your questions.',
+              timestamp: new Date(),
+            },
+          ]);
+        }
         setIsProcessing(false);
-        
-        // Generate analysis findings
-        const findings = generateAnalysisFindings();
-        setAnalysisFindings(findings);
-        
-        // Add initial AI message
-        const initialMessage: ChatMessage = {
-          id: '1',
-          type: 'ai',
-          content: 'Analysis complete! I\'ve processed your MRI scan and am ready to answer any questions about potential tumor presence, location, characteristics, or treatment options. What would you like to know?',
-          timestamp: new Date()
-        };
-        
-        setMessages([initialMessage]);
-        
-        // Update analysis in history
-        updateAnalysisInHistory(jobId, {
-          status: 'completed',
-          findings,
-          messages: [initialMessage]
-        });
-        
-        // Clear session storage
-        sessionStorage.removeItem('uploadedMRIFiles');
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
+      })
+      .catch(() => setIsProcessing(false));
   }, [jobId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const generateAnalysisFindings = (): string => {
-    const findings = [
-      'Low-grade glioma detected in frontal lobe',
-      'Benign meningioma, well-circumscribed',
-      'Multiple sclerosis lesions identified',
-      'Small arteriovenous malformation noted',
-      'Normal brain structure, no abnormalities detected',
-      'Possible early-stage tumor requiring further evaluation'
-    ];
-    return findings[Math.floor(Math.random() * findings.length)];
-  };
-
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isTyping || !jobId) return;
-
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
-
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInputMessage('');
     setIsTyping(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        'Based on the MRI analysis, I can see some areas of interest in the frontal lobe region. The tissue appears to have different density characteristics compared to normal brain tissue.',
-        'The scan shows what appears to be a small lesion approximately 1.2cm in diameter. Further clinical correlation would be recommended for definitive diagnosis.',
-        'The tumor markers suggest this could be a low-grade glioma. The location and characteristics are consistent with this type of brain tumor.',
-        'I recommend discussing these findings with your oncologist. The scan shows good overall brain structure with the abnormality confined to a specific region.',
-        'The enhancement pattern suggests this is likely benign. However, monitoring with follow-up scans would be advisable.',
-        'The location near eloquent brain areas would require careful surgical planning if intervention is needed.'
-      ];
-
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date()
-      };
-
-      const finalMessages = [...updatedMessages, aiMessage];
-      setMessages(finalMessages);
-      setIsTyping(false);
-
-      // Update history with new messages and last question
-      updateAnalysisInHistory(jobId, {
-        messages: finalMessages,
-        lastQuestion: userMessage.content
+    try {
+      const res = await fetch('http://localhost:5001/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userMessage.content, timestamp: jobId }),
       });
-    }, 1500);
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + '-ai',
+          type: 'ai',
+          content: data.response || 'No response.',
+          timestamp: new Date(),
+        },
+      ]);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + '-ai',
+          type: 'ai',
+          content: 'Error contacting AI.',
+          timestamp: new Date(),
+        },
+      ]);
+    }
+    setIsTyping(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleLaunchViewer = async () => {
+    if (!analysis) return;
+    
+    try {
+      const response = await fetch('http://localhost:5001/run-viewer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scanDir: 'scan', // Default scan directory
+          // Add tumor coordinates if available in the analysis context
+          ...(analysis.context?.tumor_detection?.coordinates && {
+            tumorCoords: analysis.context.tumor_detection.coordinates
+          })
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        alert('3D Viewer launched successfully!');
+      } else {
+        alert(result.error || 'Failed to launch 3D viewer.');
+      }
+    } catch (error) {
+      alert('Error launching 3D viewer.');
     }
   };
 
@@ -194,17 +161,17 @@ const AnalysisScreen: React.FC = () => {
           <div className="p-6">
             {/* Scan Image */}
             <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 dark:from-gray-800 dark:to-gray-700 rounded-lg mb-4 flex items-center justify-center relative overflow-hidden">
-              {uploadedFile ? (
+              {analysis?.mri_url ? (
                 <>
                   <img 
-                    src={uploadedFile.preview}
-                    alt={uploadedFile.name}
+                    src={analysis.mri_url}
+                    alt={analysis?.name || 'MRI Scan'}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute top-4 left-4 bg-black/20 backdrop-blur-sm rounded-lg px-3 py-1">
                     <p className="text-white text-sm font-medium">
-                      {uploadedFile.name.includes('t2') || uploadedFile.name.includes('T2') ? 'Axial T2' : 
-                       uploadedFile.name.includes('t1') || uploadedFile.name.includes('T1') ? 'Axial T1' : 
+                      {analysis?.name?.includes('t2') || analysis?.name?.includes('T2') ? 'Axial T2' : 
+                       analysis?.name?.includes('t1') || analysis?.name?.includes('T1') ? 'Axial T1' : 
                        'MRI Scan'}
                     </p>
                   </div>
@@ -226,27 +193,28 @@ const AnalysisScreen: React.FC = () => {
             </div>
 
             {/* File Info */}
-            {uploadedFile && (
+            {analysis && (
               <div className="bg-slate-50 dark:bg-gray-800 rounded-lg p-3 mb-6">
                 <p className="text-sm font-medium text-slate-600 dark:text-gray-400">Current Scan</p>
-                <p className="text-lg font-semibold text-slate-800 dark:text-white truncate">{uploadedFile.name}</p>
-                <p className="text-sm text-slate-500 dark:text-gray-400">{(uploadedFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                <p className="text-lg font-semibold text-slate-800 dark:text-white truncate">{analysis.name}</p>
+                <p className="text-sm text-slate-500 dark:text-gray-400">{(analysis.size / 1024 / 1024).toFixed(1)} MB</p>
               </div>
             )}
 
             {/* Analysis Findings */}
-            {analysisFindings && !isProcessing && (
+            {analysis?.summary && !isProcessing && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-6">
                 <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Key Findings</p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">{analysisFindings}</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300">{analysis.summary}</p>
               </div>
             )}
 
             {/* Action Buttons */}
             <div className="space-y-3">
               <button 
+                onClick={handleLaunchViewer}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isProcessing || !uploadedFile}
+                disabled={isProcessing || !analysis?.mri_url}
               >
                 <Cube className="h-4 w-4" />
                 <span>Launch 3D Viewer</span>
@@ -254,7 +222,7 @@ const AnalysisScreen: React.FC = () => {
               
               <button 
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-200 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isProcessing || !uploadedFile}
+                disabled={isProcessing || !analysis?.mri_url}
               >
                 <Database className="h-4 w-4" />
                 <span>Show Similar Cases</span>
@@ -262,7 +230,7 @@ const AnalysisScreen: React.FC = () => {
             </div>
 
             {/* Analysis Status */}
-            {!isProcessing && uploadedFile && (
+            {!isProcessing && analysis && (
               <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <AlertTriangle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

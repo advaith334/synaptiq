@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Calendar, MessageSquare, Brain, Clock, FileImage, Filter, X } from 'lucide-react';
-import { getAnalysisHistory, HistoryItem } from '../utils/historyStorage';
 
 const HistoryScreen: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
 
   useEffect(() => {
-    // Load history from localStorage
-    const history = getAnalysisHistory();
-    setHistoryItems(history);
+    fetch('http://localhost:5001/history')
+      .then(res => res.json())
+      .then(data => setHistoryItems(data))
+      .catch(() => setHistoryItems([]));
   }, []);
 
   const filteredHistory = historyItems.filter(item => {

@@ -67,25 +67,26 @@ const UploadScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!uploadedFile) return;
-    
     setIsUploading(true);
-    
-    // Store uploaded file in sessionStorage to pass to analysis screen
-    const fileData = [{
-      id: uploadedFile.id,
-      name: uploadedFile.file.name,
-      size: uploadedFile.file.size,
-      type: uploadedFile.file.type,
-      preview: uploadedFile.preview
-    }];
-    
-    sessionStorage.setItem('uploadedMRIFiles', JSON.stringify(fileData));
-    
-    // Simulate upload process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const jobId = Math.random().toString(36).substr(2, 9);
-    navigate(`/scan/${jobId}`);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadedFile.file);
+      const response = await fetch('http://localhost:5001/analyze_mri', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok || result.error) {
+        alert(result.error || 'Upload failed.');
+        setIsUploading(false);
+        return;
+      }
+      // Navigate to analysis screen with the returned timestamp
+      navigate(`/scan/${result.timestamp}`);
+    } catch (err) {
+      alert('Upload failed.');
+      setIsUploading(false);
+    }
   };
 
   return (
