@@ -4,8 +4,6 @@
 
 Synaptiq is an advanced web application that leverages AI to analyze brain MRI scans and provide medical insights. Built with a modern tech stack, it combines the power of Google's Gemini AI with a sophisticated 3D viewer to help medical professionals and researchers analyze brain scans for tumors, abnormalities, and other neurological conditions.
 
-![Synaptiq Landing Page](docs/images/landing.png)
-
 ## ✨ Features
 
 ### 🏠 **Landing Page**
