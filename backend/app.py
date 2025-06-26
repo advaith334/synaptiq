@@ -140,9 +140,12 @@ def process_mri_scan(image_path: Path):
         "tumor_detection": {
             "present": boolean,
             "type": string (one of "glioma", "meningioma", "pituitary", or "none"),
+            "confidence_percentage": number (confidence level in percentage for the primary diagnosis, e.g., 85.5, or 0 if N/A),
             "size": string (e.g., "2.5 cm", or "N/A"),
             "location": string (e.g., "frontal lobe", or "N/A"),
             "characteristics": string (brief description or "N/A"),
+            "key_features": array of strings (list of key imaging features, e.g., ["Heterogeneous ring enhancement", "Necrotic core"]),
+            "distinguishers": array of strings (list of distinguishing factors from other diagnoses, e.g., ["Vs. metastasis: Less vasogenic edema"]),
             "coordinates": {
             "x": number (predicted x coordinate or 0 if N/A),
             "y": number (predicted y coordinate or 0 if N/A),
@@ -155,6 +158,14 @@ def process_mri_scan(image_path: Path):
             "severity": string (e.g., "mild", "moderate", "severe", or "N/A")
         },
         "other_abnormalities": string (brief description or "none"),
+        "differential_diagnosis": array of objects (list possible alternative diagnoses with confidence percentages, or empty array if not applicable) [
+            {
+                "type": string (e.g., "glioblastoma"),
+                "confidence_percentage": number (confidence level in percentage, e.g., 60.2),
+                "key_features": array of strings (list of key imaging features, e.g., ["Heterogeneous ring enhancement", "Necrotic core"]),
+                "distinguishers": array of strings (list of distinguishing factors from other diagnoses, e.g., ["Vs. primary tumor: More uniform enhancement"])
+            }
+        ],
         "follow_up_actions": string (brief recommendation)
         }
 
